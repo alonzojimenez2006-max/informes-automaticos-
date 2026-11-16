@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Informes COFTAH</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.21.1/docxtemplater.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
+
+    <!-- PARCHE DE COMPATIBILIDAD PARA NAVEGADORES MODERNOS -->
+    <script>
+        if (typeof Element !== 'undefined') {
+            const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'namespaceURI') || 
+                               Object.getOwnPropertyDescriptor(Node.prototype, 'namespaceURI');
+            if (descriptor && !descriptor.set) {
+                Object.defineProperty(Element.prototype, 'namespaceURI', {
+                    set: function(value) { this.setAttribute('xmlns', value); },
+                    get: function() { return descriptor.get.call(this); },
+                    configurable: true
+                });
+            }
+        }
+    </script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #333; padding: 20px; margin: 0; }
+        h1, h2 { text-align: center; color: #2c3e50; }
+        .panel { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); max-width: 900px; margin: 0 auto 20px auto; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #34495e; }
+        .form-group input, .form-group textarea { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 5px;}
+        button { padding: 12px 20px; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.3s; width: 100%; }
+        
+        .btn-blue { background-color: #3498db; margin-top: 5px; } .btn-blue:hover { background-color: #2980b9; }
+        .btn-green { background-color: #27ae60; margin-top: 15px;} .btn-green:hover { background-color: #219653; }
+        
+        .dashboard-grid { display: flex; flex-direction: column; gap: 40px; max-width: 900px; margin: 0 auto; display: none; }
+        .chart-card { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); width: 100%; }
+        .chart-wrapper { position: relative; height: 500px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <h1>Generador de Informes COFTAH</h1>
+
+    <div class="panel">
+        <h2>1. Cargar Archivos y Generar Gráficos</h2>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>A. Cargar Datos (Excel)</label>
+                <input type="file" id="fileExcel" accept=".xlsx, .xls">
+                <button type="button" class="btn-blue" onclick="procesarExcelYGraficos()">1. Generar Gráficos</button>
+            </div>
+            <div class="form-group">
+                <label>B. Cargar Plantilla (Word del Facilitador)</label>
+                <input type="file" id="fileWord" accept=".docx">
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>2. Datos para el Informe Word</h2>
+        <div class="grid-2">
+            <div class="form-group"><label>Nombre del Curso</label><input type="text" id="inCurso" value="Lectura e Interpretación de HDSM"></div>
+            <div class="form-group"><label>Facilitador</label><input type="text" id="inFacilitador" value="Rafael Marín"></div>
+            <div class="form-group"><label>Fecha en portada</label><input type="text" id="inFecha" value="14 de Agosto de 2026"></div>
+            <div class="form-group"><label>Lugar (Ciudad)</label><input type="text" id="inCiudad" value="El Tigre"></div>
+            <div class="form-group"><label>Lugar (Estado)</label><input type="text" id="inEstado" value="Anzoátegui"></div>
+            <div class="form-group"><label>Duración (Horas)</label><input type="number" id="inDuracion" value="8"></div>
+            <div class="form-group"><label>Empresa a facturar</label><input type="text" id="inEmpresa" value="AGARCORP DE VENEZUELA"></div>
+        </div>
+        <div class="form-group">
+            <label>Participantes (Formato: Nombre Apellido - Cédula. Uno por línea)</label>
+            <textarea id="inParticipantes" rows="4">OSCAR DAZA - 16.571.909
+WILLIAMS RODRIGUEZ - 24.228.695</textarea>
+        </div>
+        <button type="button" class="btn-green" onclick="generarReporteWord()">2. Descargar Informe Word</button>
+    </div>
+
+    <div class="dashboard-grid" id="dashboard">
+        <h2>Visualización de Gráficos</h2>
+        <div class="chart-card"><div class="chart-wrapper"><canvas id="graficoEsfuerzo"></canvas></div></div>
+        <div class="chart-card"><div class="chart-wrapper"><canvas id="graficoHabilidades"></canvas></div></div>
+        <div class="chart-card"><div class="chart-wrapper"><canvas id="graficoFacilitador"></canvas></div></div>
+        <div class="chart-card"><div class="chart-wrapper"><canvas id="graficoContenido"></canvas></div></div>
+        <div class="chart-card"><div class="chart-wrapper"><canvas id="graficoValoracion"></canvas></div></div>
+    </div>
+
+    <script>
+        let datosGlobales = []; 
+        let graficosActivos = {}; 
+        let fileWordContent = null;
+        let archivoExcelFisico = null; 
+
+        document.getElementById('fileWord').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) { 
+                fileWordContent = e.target.result; 
+                alert("✅ Plantilla Word cargada correctamente en memoria.");
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        document.getElementById('fileExcel').addEventListener('change', function(e) {
+            archivoExcelFisico = e.target.files[0];
+        });
+
+        // Extraer comentarios agrupados de Excel
+        function extraerComentarios(datos, columnaBuscada) {
+            if(datos.length === 0) return [];
+            let cabeceras = Object.keys(datos[0]);
+            let colLimpia = columnaBuscada.trim();
+            let fragmento = colLimpia.includes('[') ? colLimpia.split('[')[0].trim() : colLimpia;
+            let llaveReal = cabeceras.find(k => k === colLimpia || k.includes(fragmento)) || colLimpia;
+            
+            let lista = [];
+            datos.forEach(row => {
+                if(row[llaveReal] && row[llaveReal].toString().trim() !== "") {
+                    lista.push({ texto: row[llaveReal].toString().trim() });
+                }
+            });
+            return lista;
+        }
+
+        function procesarExcelYGraficos() {
+            if (!archivoExcelFisico) {
+                alert("⚠ Por favor, selecciona primero tu archivo Excel.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    let datosEnBruto = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ""});
+                    let headerIndex = 0;
+                    for (let i = 0; i < datosEnBruto.length; i++) {
+                        if (datosEnBruto[i].some(celda => typeof celda === 'string' && (celda.includes('Nivel') || celda.includes('Facilitador')))) {
+                            headerIndex = i;
+                            break;
+                        }
+                    }
+
+                    const cabecerasReales = datosEnBruto[headerIndex];
+                    let filasDeDatos = datosEnBruto.slice(headerIndex + 1);
+
+                    datosGlobales = filasDeDatos.map(fila => {
+                        let obj = {};
+                        cabecerasReales.forEach((cabecera, index) => {
+                            if (cabecera && cabecera.trim() !== "") {
+                                obj[cabecera.trim()] = fila[index];
+                            }
+                        });
+                        return obj;
+                    });
+
+                    document.getElementById('dashboard').style.display = 'flex';
+                    setTimeout(() => {
+                        generarGraficas(datosGlobales);
+                        document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
+                    }, 200);
+
+                } catch (error) {
+                    alert("❌ Error procesando el Excel: " + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(archivoExcelFisico);
+        }
+
+        function contarRespuestas(datos, columnas, etiquetasBuscadas) {
+            let resultado = etiquetasBuscadas.map(() => columnas.map(() => 0));
+            if(datos.length === 0) return resultado;
+            let cabecerasExcel = Object.keys(datos[0]);
+
+            datos.forEach(row => {
+                columnas.forEach((columnaBuscada, colIndex) => {
+                    let colLimpia = columnaBuscada.trim();
+                    let fragmentoBuscado = colLimpia.includes('[') ? colLimpia.split('[')[0].trim() : colLimpia;
+                    let llaveReal = cabecerasExcel.find(k => k === colLimpia || k.includes(fragmentoBuscado)) || colLimpia;
+                    let respuesta = row[llaveReal] ? row[llaveReal].toString().trim() : "";
+                    let rowIndex = etiquetasBuscadas.indexOf(respuesta);
+                    if (rowIndex !== -1) resultado[rowIndex][colIndex]++;
+                });
+            });
+            return resultado;
+        }
+
+        function generarGraficas(datos) {
+            function getOptions(titulo) {
+                return { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' }, title: { display: true, text: titulo, font: { size: 16 } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } };
+            }
+            function crearGrafico(idCanvas, tipo, labelsX, datasetsInfo, titulo) {
+                if (graficosActivos[idCanvas]) graficosActivos[idCanvas].destroy();
+                graficosActivos[idCanvas] = new Chart(document.getElementById(idCanvas).getContext('2d'), { type: tipo, data: { labels: labelsX, datasets: datasetsInfo }, options: getOptions(titulo) });
+            }
+
+            crearGrafico('graficoEsfuerzo', 'bar', ['Esfuerzo'], [{ label: 'Alto', data: contarRespuestas(datos, ["Nivel de esfuerzo: [Nivel de esfuerzo que ha dedicado al curso]"], ["Alto", "Medio"])[0], backgroundColor: '#27ae60' }, { label: 'Medio', data: contarRespuestas(datos, ["Nivel de esfuerzo: [Nivel de esfuerzo que ha dedicado al curso]"], ["Alto", "Medio"])[1], backgroundColor: '#f39c12' }], `1. Esfuerzo`);
+            crearGrafico('graficoHabilidades', 'bar', [['Al principio'], ['Al final'], ['Necesarios'], ['Contribución']], [{ label: 'Excelente', data: contarRespuestas(datos, ["Nivel de habilidades: [Nivel de habilidades o conocimientos al principio del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos al final del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos necesarios para completar el curso]", "Nivel de habilidades: [¿En qué medida ha contribuido el curso a mejorar tus habilidades o conocimientos?]"], ["Excelente", "Satisfactorio", "Medio", "Deficiente"])[0], backgroundColor: '#27ae60' }, { label: 'Satisfactorio', data: contarRespuestas(datos, ["Nivel de habilidades: [Nivel de habilidades o conocimientos al principio del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos al final del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos necesarios para completar el curso]", "Nivel de habilidades: [¿En qué medida ha contribuido el curso a mejorar tus habilidades o conocimientos?]"], ["Excelente", "Satisfactorio", "Medio", "Deficiente"])[1], backgroundColor: '#3498db' }, { label: 'Medio', data: contarRespuestas(datos, ["Nivel de habilidades: [Nivel de habilidades o conocimientos al principio del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos al final del curso]", "Nivel de habilidades: [Nivel de habilidades o conocimientos necesarios para completar el curso]", "Nivel de habilidades: [¿En qué medida ha contribuido el curso a mejorar tus habilidades o conocimientos?]"], ["Excelente", "Satisfactorio", "Medio", "Deficiente"])[2], backgroundColor: '#f39c12' }], '2. Nivel de Habilidades');
+            crearGrafico('graficoFacilitador', 'bar', [['Explicaciones claras'], ['Atento']], [{ label: 'Excelente', data: contarRespuestas(datos, ["Nivel del Facilitador [Las explicaciones eran claras y estaban bien estructuradas]", "Nivel del Facilitador [El Facilitador se mostraba atento y dispuesto a ayudar]"], ["Excelente", "Satisfactorio", "Medio"])[0], backgroundColor: '#27ae60' }, { label: 'Satisfactorio', data: contarRespuestas(datos, ["Nivel del Facilitador [Las explicaciones eran claras y estaban bien estructuradas]", "Nivel del Facilitador [El Facilitador se mostraba atento y dispuesto a ayudar]"], ["Excelente", "Satisfactorio", "Medio"])[1], backgroundColor: '#3498db' }, { label: 'Medio', data: contarRespuestas(datos, ["Nivel del Facilitador [Las explicaciones eran claras y estaban bien estructuradas]", "Nivel del Facilitador [El Facilitador se mostraba atento y dispuesto a ayudar]"], ["Excelente", "Satisfactorio", "Medio"])[2], backgroundColor: '#f39c12' }], '3. Facilitador');
+            crearGrafico('graficoContenido', 'bar', [['Objetivos'], ['Organizado'], ['Actividades'], ['Participación']], [{ label: 'Excelente', data: contarRespuestas(datos, ["Contenido del curso: [Los objetivos del curso estaban claros.]", "Contenido del curso: [El contenido del curso estaba bien organizado y planificado.]", "Contenido del curso: [Las actividades del curso fueron las adecuadas.]", "Contenido del curso: [Los alumnos pudieron participar activamente en el curso]"], ["Excelente", "De acuerdo", "Neutral"])[0], backgroundColor: '#27ae60' }, { label: 'De acuerdo', data: contarRespuestas(datos, ["Contenido del curso: [Los objetivos del curso estaban claros.]", "Contenido del curso: [El contenido del curso estaba bien organizado y planificado.]", "Contenido del curso: [Las actividades del curso fueron las adecuadas.]", "Contenido del curso: [Los alumnos pudieron participar activamente en el curso]"], ["Excelente", "De acuerdo", "Neutral"])[1], backgroundColor: '#3498db' }, { label: 'Neutral', data: contarRespuestas(datos, ["Contenido del curso: [Los objetivos del curso estaban claros.]", "Contenido del curso: [El contenido del curso estaba bien organizado y planificado.]", "Contenido del curso: [Las actividades del curso fueron las adecuadas.]", "Contenido del curso: [Los alumnos pudieron participar activamente en el curso]"], ["Excelente", "De acuerdo", "Neutral"])[2], backgroundColor: '#f39c12' }], '4. Contenido');
+            crearGrafico('graficoValoracion', 'bar', ['Valoración General'], [{ label: '5 Puntos', data: contarRespuestas(datos, ["Valoración del curso:"], ["5", "4", "3", "2", "1"])[0], backgroundColor: '#27ae60' }], '5. Valoración');
+        }
+
+        // Generar Word Final
+        function generarReporteWord() {
+            if (!fileWordContent) {
+                alert("⚠ Por favor, carga tu plantilla de Word (.docx) primero.");
+                return;
+            }
+
+            let canvasEsfuerzo = document.getElementById('graficoEsfuerzo');
+            if (canvasEsfuerzo.width === 0 || canvasEsfuerzo.height === 0) {
+                alert("⚠ Los gráficos no están listos. Haz clic en '1. Generar Gráficos' primero.");
+                return;
+            }
+
+            let textoParticipantes = document.getElementById('inParticipantes').value.split('\n');
+            let listaParticipantes = [];
+            textoParticipantes.forEach((linea, index) => {
+                if(linea.trim() !== ""){
+                    let partes = linea.split('-');
+                    let num = (index + 1).toString();
+                    if(num.length === 1) num = "0" + num;
+                    listaParticipantes.push({ numero: num, nombre: partes[0] ? partes[0].trim() : "", cedula: partes[1] ? partes[1].trim() : "" });
+                }
+            });
+
+            let datosParaWord = {
+                curso: document.getElementById('inCurso').value,
+                facilitador: document.getElementById('inFacilitador').value, 
+                fecha: document.getElementById('inFecha').value,
+                lugar_ciudad: document.getElementById('inCiudad').value,
+                lugar_estado: document.getElementById('inEstado').value,
+                duracion_horas: document.getElementById('inDuracion').value,
+                empresa: document.getElementById('inEmpresa').value,
+                total_participantes: listaParticipantes.length > 0 ? listaParticipantes.length : datosGlobales.length,
+                participantes: listaParticipantes,
+
+                // Extrae e inyecta los Comentarios Reales desde el Excel
+                com_utiles: extraerComentarios(datosGlobales, "¿Qué sección del curso le resultó más útil?"),
+                com_mejoras: extraerComentarios(datosGlobales, "¿Qué mejoraría del curso y por qué?"),
+                com_generales: extraerComentarios(datosGlobales, "Comentario General:"),
+                com_otros: extraerComentarios(datosGlobales, "Mencione otros temas o Acciones de Formación"),
+                
+                // Gráficos
+                grafico1: document.getElementById('graficoEsfuerzo').toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, ""),
+                grafico2: document.getElementById('graficoHabilidades').toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, ""),
+                grafico3: document.getElementById('graficoFacilitador').toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, ""),
+                grafico4: document.getElementById('graficoContenido').toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, ""),
+                grafico5: document.getElementById('graficoValoracion').toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, "")
+            };
+
+            try {
+                const zip = new PizZip(fileWordContent);
+                const imageOptions = {
+                    centered: true,
+                    getImage: function(tagValue, tagName) {
+                        const binary_string = window.atob(tagValue);
+                        const bytes = new Uint8Array(binary_string.length);
+                        for (let i = 0; i < binary_string.length; i++) { bytes[i] = binary_string.charCodeAt(i); }
+                        return bytes.buffer;
+                    },
+                    getSize: function(img, tagValue, tagName) { return [500, 250]; }
+                };
+                
+                const ImageModule = window.ImageModule || window.docxtemplaterImageModuleFree;
+                const doc = new window.docxtemplater(zip, {
+                    paragraphLoop: true,
+                    linebreaks: true,
+                    modules: [new ImageModule(imageOptions)] 
+                });
+                
+                doc.setData(datosParaWord);
+                doc.render(); 
+                
+                const out = doc.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                saveAs(out, "Informe_" + datosParaWord.empresa.replace(/\s+/g, '_') + ".docx");
+                
+            } catch (error) {
+                console.error(error);
+                if (error.properties && error.properties.errors instanceof Array) {
+                    alert("❌ Error en las etiquetas de tu plantilla Word:\n\n" + error.properties.errors.map(e => e.properties.explanation).join("\n"));
+                } else {
+                   alert("❌ Error técnico: " + error.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
