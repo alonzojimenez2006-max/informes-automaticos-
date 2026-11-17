@@ -81,6 +81,18 @@
             <textarea id="inParticipantes" rows="4">OSCAR DAZA - 16.571.909
 WILLIAMS RODRIGUEZ - 24.228.695</textarea>
         </div>
+        <div class="form-group">
+            <label>Contenido Programático</label>
+            <textarea id="inContenido" rows="4">Escriba o pegue aquí el contenido programático...</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Foto Grupal (Haz clic en el recuadro y presiona Ctrl+V para pegar la imagen)</label>
+            <div id="pasteArea" tabindex="0" style="border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; background: #fafafa; border-radius: 6px; color: #7f8c8d; font-weight: bold; outline: none;">
+                Haga clic aquí y presione Ctrl+V para pegar la Foto Grupal
+            </div>
+            <img id="previewFoto" style="display:none; max-width: 100%; margin-top: 10px; border-radius: 6px; max-height: 250px; object-fit: contain;" />
+        </div>
         <button type="button" class="btn-green" onclick="generarReporteWord()">2. Descargar Informe Word</button>
     </div>
 
@@ -99,6 +111,29 @@ WILLIAMS RODRIGUEZ - 24.228.695</textarea>
         let fileWordContent = null;
         let archivoExcelFisico = null; 
 
+        let fotoGrupalBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; 
+
+        document.getElementById('pasteArea').addEventListener('paste', function (e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.includes('image/')) {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        const base64Str = event.target.result;
+                        document.getElementById('previewFoto').src = base64Str;
+                        document.getElementById('previewFoto').style.display = 'block';
+                        document.getElementById('pasteArea').innerText = '✅ Imagen pegada correctamente';
+                        document.getElementById('pasteArea').style.borderColor = '#27ae60';
+                        document.getElementById('pasteArea').style.color = '#27ae60';
+                        fotoGrupalBase64 = base64Str.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+
         document.getElementById('fileWord').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -114,7 +149,7 @@ WILLIAMS RODRIGUEZ - 24.228.695</textarea>
             archivoExcelFisico = e.target.files[0];
         });
 
-        // Extraer comentarios agrupados de Excel
+        // Extraer comentarios agrupados de Excel (Mejorado)
         function extraerComentarios(datos, columnaBuscada) {
             if(datos.length === 0) return [];
             let cabeceras = Object.keys(datos[0]);
@@ -123,9 +158,18 @@ WILLIAMS RODRIGUEZ - 24.228.695</textarea>
             let llaveReal = cabeceras.find(k => k === colLimpia || k.includes(fragmento)) || colLimpia;
             
             let lista = [];
+            let controlDuplicados = new Set();
+            
             datos.forEach(row => {
                 if(row[llaveReal] && row[llaveReal].toString().trim() !== "") {
-                    lista.push({ texto: row[llaveReal].toString().trim() });
+                    let texto = row[llaveReal].toString().trim();
+                    if (!texto.endsWith('.')) texto += '.';
+                    
+                    let textoId = texto.toLowerCase();
+                    if (!controlDuplicados.has(textoId)) {
+                        controlDuplicados.add(textoId);
+                        lista.push({ texto: texto });
+                    }
                 }
             });
             return lista;
@@ -247,6 +291,8 @@ WILLIAMS RODRIGUEZ - 24.228.695</textarea>
                 empresa: document.getElementById('inEmpresa').value,
                 total_participantes: listaParticipantes.length > 0 ? listaParticipantes.length : datosGlobales.length,
                 participantes: listaParticipantes,
+                contenido_programatico: document.getElementById('inContenido').value,
+                foto_grupal: fotoGrupalBase64,
 
                 // Extrae e inyecta los Comentarios Reales desde el Excel
                 com_utiles: extraerComentarios(datosGlobales, "¿Qué sección del curso le resultó más útil?"),
@@ -272,7 +318,10 @@ WILLIAMS RODRIGUEZ - 24.228.695</textarea>
                         for (let i = 0; i < binary_string.length; i++) { bytes[i] = binary_string.charCodeAt(i); }
                         return bytes.buffer;
                     },
-                    getSize: function(img, tagValue, tagName) { return [500, 250]; }
+                    getSize: function(img, tagValue, tagName) { 
+                        if (tagName === "foto_grupal") return [600, 380]; 
+                        return [500, 250]; 
+                    }
                 };
                 
                 const ImageModule = window.ImageModule || window.docxtemplaterImageModuleFree;
